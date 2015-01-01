@@ -1,9 +1,4 @@
 name: HGGodWars
 main: org.bitbucket.platky.HGGodWars.HGGodWars
 version: 0.0.1
-commands:
-    godwars:
-        description: Base Plugin Command
-        usage: /<command>
-        permission: <plugin name>.godwars
-        permission-message: You don't have <permission>
+author: Platky
