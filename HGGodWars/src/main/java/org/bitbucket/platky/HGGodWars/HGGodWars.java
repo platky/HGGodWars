@@ -3,8 +3,8 @@ package org.bitbucket.platky.HGGodWars;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
+//import java.sql.Connection;
+//import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -28,9 +28,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class HGGodWars extends JavaPlugin{
 
 
-	public static HGGodWars hggw = new HGGodWars();
+	//public static HGGodWars hggw = new HGGodWars();
 	public static File dataString;
 	public static List<God> gods = new ArrayList<God>();
+	public static List<PlayerData> players = new ArrayList<PlayerData>();
 	
 	public void onEnable() {
 		Bukkit.getLogger().info("onEnable has been invoked");
@@ -48,6 +49,7 @@ public class HGGodWars extends JavaPlugin{
 			playerFolder.mkdir();
 		}
 		loadConfig();
+		initPlayers();
 		initGods();
 	}
 	
@@ -71,7 +73,7 @@ public class HGGodWars extends JavaPlugin{
 		saveConfig();
 	}
 	
-	public void startSql() {
+	/*public void startSql() {
 		Connection c = null;
 		try {
 			Class.forName("org.sqlite.JDBC");
@@ -79,10 +81,14 @@ public class HGGodWars extends JavaPlugin{
 		} catch (Exception e) {
 			
 		}
-	}
+	}*/
 	
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 		if (cmd.getName().equalsIgnoreCase("godwars")) {
+			if (args.length ==0) {
+				//god help
+				return true;
+			}
 			if(args[0].equalsIgnoreCase("create")) {
 				if(!sender.hasPermission("godwars.create")) { //================================================
 					sender.sendMessage(ChatColor.RED + "You do not have permission");
@@ -196,15 +202,16 @@ public class HGGodWars extends JavaPlugin{
 	//get all the god files and initialize
 	public void initGods() {
 		File dataFolder = getDataFolder();
-		File[] fileList = dataFolder.listFiles();
+		File godFolder =  new File(dataFolder + File.separator + "Gods");
+		File[] fileList = godFolder.listFiles();
 		YamlConfiguration yamlFile;
 		String godName;
 		Boolean godActive;
 		String godType;
 		String godAlign;
 		int godPoints;
-		List<String> pnameList = new ArrayList<String>();
-		List<Player> playerList=new ArrayList<Player>();
+		List<String> idList = new ArrayList<String>();
+		List<PlayerData> playerList=new ArrayList<PlayerData>();
 		List<Shrine> shrineList = new ArrayList<Shrine>();
 		for (int i =0; i< fileList.length; i++) {
 			if(fileList[i].getName() != "config.yml") { //verify this statement
@@ -214,10 +221,11 @@ public class HGGodWars extends JavaPlugin{
 				godType = yamlFile.getString("Type");
 				godAlign = yamlFile.getString("Alignment");
 				godPoints = yamlFile.getInt("Points");
-				pnameList = yamlFile.getStringList("Members");
-				for (int j=0; j < pnameList.size(); j++) {
-					UUID pID =UUID.fromString(pnameList.get(j)); //convert from string back to uuid
-					playerList.add(getServer().getPlayer(pID)); //find the player by uuid and add it to list
+				idList = yamlFile.getStringList("Members");
+				for (int j=0; j < idList.size(); j++) {
+					UUID pID =UUID.fromString(idList.get(j)); //convert from string back to uuid
+					PlayerData curPlayer = findPlayerD(pID);
+					playerList.add(curPlayer); //holding a list of references to our playerData list
 				}
 				//officially create an instance of the god and throw it into our arraylist
 				//shrinelists not currently implemented
@@ -227,10 +235,27 @@ public class HGGodWars extends JavaPlugin{
 		}
 	}
 	
-	//get all the player files and initialize
+	//get all the player files and initialize (when players come online remember to update data)
 	public void initPlayers() {
+		File dataFolder = getDataFolder();
+		File playerFolder =  new File(dataFolder + File.separator + "Players");
+		File[] fileList = playerFolder.listFiles();
+		YamlConfiguration yamlFile;
+		Player curPlayer=null;
+		String godName;
+		int karma;
+		UUID id;
+		for (int i=0; i<fileList.length; i++) {
+			yamlFile = YamlConfiguration.loadConfiguration(fileList[i]);
+			id = UUID.fromString(yamlFile.getString("UUID"));
+			godName = yamlFile.getString("God");
+			karma = yamlFile.getInt("Karma");
+			PlayerData newPlayer = new PlayerData(curPlayer, godName, karma, id);
+			players.add(newPlayer);
+		}
 		
 	}
+	
 	//create the gods file and initialize it
 	public boolean createGod(String godName, String godType, String godAlign, String[] args, CommandSender sender) {
 		
@@ -262,16 +287,16 @@ public class HGGodWars extends JavaPlugin{
 				yamlFile.set("Members",memberList);
 				//will probably have to list shrines here aswell
 				
-				yamlFile.save(getDataFolder()+ File.separator+  godName+".yml");
+				yamlFile.save(getDataFolder()+ File.separator+"Gods"+File.separator+  godName+".yml");
 
 				player.sendMessage(ChatColor.GREEN + "God Created!");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 
-			List<Player> playerList=new ArrayList<Player>();
+			List<PlayerData> playerList=new ArrayList<PlayerData>();
 			List<Shrine> shrineList = new ArrayList<Shrine>();
-			playerList.add(player);
+			playerList.add(findPlayerD(player.getUniqueId()));
 			God newGod = new God(godName, false, godType, godAlign, 0, playerList, shrineList);
 			gods.add(newGod);
 			
@@ -286,26 +311,45 @@ public class HGGodWars extends JavaPlugin{
 	//have the player join a god
 	public boolean joinGod(String godName, CommandSender sender) {
 		Player player = (Player) sender;
-		if(findPlayerGod(player)!=null) {
+		if(nameToGod(godName)!=null) {
 			sender.sendMessage(ChatColor.RED + "You are already following a god, type /godwars leave");
 			return false;
 		}
-		God curGod = findGod(godName); //make sure that this is a reference and not a copy else it wont work.
-		curGod.addPlayer(player);
+		God curGod = findGod(godName);
+		curGod.addPlayer(findPlayerD(player.getUniqueId()));
 		updateActive(curGod);
+		saveGod(godName);
 		return true;
 	}
 	
 	//locate a god in our data list
 	public God findGod(String godName){
 		for(int i=0; i<gods.size(); i++) {
-			if(gods.get(i).getGName() == godName) {
+			if(gods.get(i).getGName().equalsIgnoreCase(godName)) {
 				return gods.get(i);
 			}
 		}
 		return null; //god does not exist with that name
 	}
 	
+	public PlayerData findPlayerD(UUID givId) {
+		for (int i=0; i<players.size(); i++) {
+			if (givId == players.get(i).getUUID()) {
+				return players.get(i);
+			}
+		}
+		return null;
+	}
+	
+	public int findGodInd(String godName) {
+
+		for(int i=0; i<gods.size(); i++) {
+			if(gods.get(i).getGName() == godName) {
+				return i;
+			}
+		}
+		return -1; //god does not exist with that name
+	}
 	//update the gods status as active or not
 	public void updateActive(God givenGod) {
 		int reqPlayer = getConfig().getInt("Restrictions.MinPlayers");
@@ -326,12 +370,21 @@ public class HGGodWars extends JavaPlugin{
 	
 	//message all the players when the gods become active or not
 	public void msgActive(God givenGod, boolean way){
-		List<Player> curPlayers = givenGod.getPlayers();
+		List<PlayerData> curPlayers = givenGod.getPlayers();
+		Player player;
 		for (int i=0; i<givenGod.playerCount(); i++) {
 			if (way == true) { //becoming active
-				curPlayers.get(i).sendMessage(ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
+				player = curPlayers.get(i).getPlayer();
+				if (player==null){ //player is not online
+					break;
+				}
+				player.sendMessage(ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
 			} else if(way ==false){ //becoming inactive
-				curPlayers.get(i).sendMessage(ChatColor.RED + "Your god "+givenGod.getGName()+" is no longer active in this world");
+				player = curPlayers.get(i).getPlayer();
+				if (player==null){ //player is not online
+					break;
+				}
+				player.sendMessage(ChatColor.RED + "Your god "+givenGod.getGName()+" is no longer active in this world");
 			}
 		}
 	}
@@ -339,14 +392,14 @@ public class HGGodWars extends JavaPlugin{
 	//give the player a list of current gods
 	public void listGods(CommandSender sender,int pageNum, boolean sortIt){
 		List<God> curGods = gods;
-		if (sortIt == true){
-			curGods=godSort(curGods);
-		}
+		//if (sortIt == true){
+		//	curGods=godSort(curGods);
+		//}
 		//list 10 gods at a time
 		sender.sendMessage(ChatColor.GOLD + "List of Gods (Name - Type - Player Count)");
-		sender.sendMessage(ChatColor.GOLD + "-----------------------------------------");
+		sender.sendMessage(ChatColor.GOLD + "------------------------------------");
 		int c = 10*pageNum -10;
-		int pageMax = (int)Math.ceil(curGods.size()/10);
+		int pageMax = (int)(Math.ceil((double)(curGods.size())/10)); //not working
 		for (int i=c; i<(c+10); i++) {
 			if (i>=curGods.size()) {
 				break;
@@ -419,7 +472,7 @@ public class HGGodWars extends JavaPlugin{
 	public void listGodTypes(CommandSender sender) {
 
 		sender.sendMessage(ChatColor.GOLD + "-------------List of God Types-----------");
-		sender.sendMessage(ChatColor.GOLD + "-----------------------------------------");
+		sender.sendMessage(ChatColor.GOLD + "---------------------------------------");
 		//hardcoded
 		sender.sendMessage("1. Agriculture");//flowers
 		//sender.sendMessage("2. Crafting");//
@@ -468,7 +521,7 @@ public class HGGodWars extends JavaPlugin{
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Increased dig speed and soil drops");
 			return true;
 		} else if (type.equalsIgnoreCase("Sea")) {
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Agriculture");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Sea");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "fish, buckets of water");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Breath underwater, Fishing increase");
 			return true;
@@ -495,7 +548,7 @@ public class HGGodWars extends JavaPlugin{
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Passive money increase");
 			return true;
 		} else {
-			sender.sendMessage(ChatColor.RED + "That is not one of the availabel types");
+			//sender.sendMessage(ChatColor.RED + "That is not one of the available types");
 		}
 		return false;
 	}
@@ -516,14 +569,14 @@ public class HGGodWars extends JavaPlugin{
 			sender.sendMessage(ChatColor.GOLD + curGod.getGName());
 			sender.sendMessage(ChatColor.GOLD + "Active: " + ChatColor.WHITE + curGod.isActive());
 			sender.sendMessage(ChatColor.GOLD + "Type: " + ChatColor.WHITE + curGod.getType());
-			sender.sendMessage(ChatColor.GOLD + "Alignment: " + ChatColor.WHITE + curGod.getType());
-			sender.sendMessage(ChatColor.GOLD + "Points: " + ChatColor.WHITE + curGod.getType());
+			sender.sendMessage(ChatColor.GOLD + "Alignment: " + ChatColor.WHITE + curGod.getAlignment());
+			sender.sendMessage(ChatColor.GOLD + "Points: " + ChatColor.WHITE + curGod.getPoints());
 			sender.sendMessage(ChatColor.GOLD + "# of Shrines: " + ChatColor.WHITE + curGod.shrineCount());
 			sender.sendMessage(ChatColor.GOLD + "Players: " + ChatColor.WHITE + curGod.playerCount() +" total");
-			List<Player> curPlayers = curGod.getPlayers();
+			List<PlayerData> curPlayers = curGod.getPlayers();
 			if (curGod.playerCount() < 10) {
 				for (int i=0; i<curGod.playerCount(); i++) {
-					sender.sendMessage("- "+ curPlayers.get(i).getName());
+					sender.sendMessage("- "+ curPlayers.get(i).getName()); //error here
 				}
 			} else {
 				for (int i=0; i<10; i++) {
@@ -564,7 +617,7 @@ public class HGGodWars extends JavaPlugin{
 			return false;
 		} else {
 			try {
-				File f = new File(dataString+ File.separator+  godName+".yml");
+				File f = new File(dataString+ File.separator+"Gods"+File.separator+  godName+".yml");
 				YamlConfiguration yamlFile = YamlConfiguration.loadConfiguration(f);
 			
 				God curGod = findGod(godName);
@@ -574,7 +627,32 @@ public class HGGodWars extends JavaPlugin{
 				yamlFile.set("Members",curGod.getPlayers());
 				//will probably have to list shrines here aswell
 			
-				yamlFile.save(getDataFolder()+ File.separator+  godName+".yml");
+				yamlFile.save(getDataFolder()+ File.separator+"Gods"+File.separator+  godName+".yml");
+				return true;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return false;
+			}
+		}
+	}
+	
+	public boolean savePlayer(UUID id){
+		String idString =id.toString();
+		if(!pFileExist(id)) {
+			Bukkit.getLogger().info("no file for that player exists");
+			//recreate file??
+			return false;
+		} else {
+			try {
+				File f = new File(dataString+ File.separator+"Playerse"+File.separator+  idString+".yml");
+				YamlConfiguration yamlFile = YamlConfiguration.loadConfiguration(f);
+			
+				PlayerData curPlayer = findPlayerD(id);
+				yamlFile.set("UUID", id.toString());
+				yamlFile.set("God", curPlayer.getGodName());
+				yamlFile.set("Karma", curPlayer.getKarma());
+			
+				yamlFile.save(getDataFolder()+ File.separator+  "Players" +File.separator+idString+".yml");
 				return true;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -592,7 +670,7 @@ public class HGGodWars extends JavaPlugin{
 	}
 	
 	//the current god manager can assign someone else
-	@SuppressWarnings("deprecation")
+	/*@SuppressWarnings("deprecation")
 	public boolean changeManager(CommandSender sender, String newPlayer) {
 		//check if currently manager
 		Player player = (Player) sender;
@@ -623,12 +701,11 @@ public class HGGodWars extends JavaPlugin{
 				return false;
 			}
 		}
-	}
+	}*/
 	
-	//TODO I dont think this works. make sure im not editting a copy
 	//admin can switch the manager of a god they dont manage
-	@SuppressWarnings("deprecation")
-	public boolean adminChangeManager(CommandSender sender, String godName, String newPlayer) {
+	//@SuppressWarnings("deprecation")
+	/*public boolean adminChangeManager(CommandSender sender, String godName, String newPlayer) {
 		God curGod = findGod(godName);
 		Player newManager = getServer().getPlayer(newPlayer);
 		if (newManager == null) {
@@ -653,7 +730,7 @@ public class HGGodWars extends JavaPlugin{
 				return true;
 			
 		}
-	}
+	}*/
 	
 	//find the god which has the specific player in it, return null if not found
 	public God findPlayerGod(Player player) {
@@ -665,18 +742,50 @@ public class HGGodWars extends JavaPlugin{
 		return null;
 	}
 	
+	//get the specific god from just the name
+	public God nameToGod(String godName){
+		for (int i=0; i<gods.size(); i++) {
+			if(gods.get(i).getGName()==godName) {
+				return gods.get(i);
+			}
+		}
+		return null;
+	}
+	
 	public Boolean fileExist(String fileName) {
-		File file = new File(dataString+ File.separator+ fileName+".yml");
+		File file = new File(dataString+ File.separator+"Gods" + File.separator+ fileName+".yml");
+		return file.exists();
+	}
+	
+	public static Boolean pFileExist(UUID id) {
+		String idString = id.toString();
+		File file = new File(dataString+File.separator+"Players"+ File.separator+idString+".yml");
 		return file.exists();
 	}
 	
 	
 	public void leaveGod(God curGod, CommandSender sender) {
 		Player player = (Player) sender;
-		if (curGod.getPlayers().contains(player)) {
-			curGod.removePlayer(player);
+		PlayerData playerD = findPlayerD(player.getUniqueId());
+		if (curGod.getPlayers().contains(playerD)) {
+			curGod.removePlayer(playerD);
 			sender.sendMessage(ChatColor.GREEN + "You have successfully left " + curGod.getGName());
 		}
+		saveGod(curGod.getGName());//save the file after removing the player
+		savePlayer(player.getUniqueId());
 	}
 	
+	public static PlayerData findPlayerData(Player player) {
+		for (int i=0; i<players.size(); i++) {
+			if(players.get(i).getPlayer() == player) {
+				return players.get(i);
+			}
+		}
+		return null;
+	}
 }
+
+//TODO gods list does not work properly
+//TODO godwars info does not work properly
+//TODO godwars join not working
+//TODO god file not updating after leaving

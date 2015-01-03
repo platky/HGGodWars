@@ -1,9 +1,7 @@
 package org.bitbucket.platky.HGGodWars;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import org.bukkit.entity.Player;
 
 
 public class God {
@@ -12,10 +10,10 @@ public class God {
 	private String type = null;
 	private String align=null;
 	private int points =0;
-	private List<Player> players = new ArrayList<Player>();
-	private List<Shrine> shrines = new ArrayList<Shrine>();
+	private List<PlayerData> players ;
+	private List<Shrine> shrines;
 	
-	public God(String godName, boolean godActive, String godType, String godAlign, int godPoints, List<Player> playerList, List<Shrine> shrineList) {
+	public God(String godName, boolean godActive, String godType, String godAlign, int godPoints, List<PlayerData> playerList, List<Shrine> shrineList) {
 		this.name=godName;
 		this.active=godActive;
 		this.type= godType;
@@ -49,15 +47,15 @@ public class God {
 		this.points=givPoints;
 	}
 	
-	public List<Player> getPlayers () {
+	public List<PlayerData> getPlayers () {
 		return this.players;
 	}
 	
-	public void addPlayer(Player newPlayer) {
+	public void addPlayer(PlayerData newPlayer) {
 		this.players.add(newPlayer);
 	}
 	
-	public void removePlayer(Player oldPlayer) {
+	public void removePlayer(PlayerData oldPlayer) {
 		this.players.remove(oldPlayer);
 	}
 	
