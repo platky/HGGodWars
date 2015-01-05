@@ -1,6 +1,7 @@
 package org.bitbucket.platky.HGGodWars;
 
 import java.util.List;
+import java.util.UUID;
 
 
 
@@ -10,10 +11,10 @@ public class God {
 	private String type = null;
 	private String align=null;
 	private int points =0;
-	private List<PlayerData> players ;
+	private List<UUID> players;
 	private List<Shrine> shrines;
 	
-	public God(String godName, boolean godActive, String godType, String godAlign, int godPoints, List<PlayerData> playerList, List<Shrine> shrineList) {
+	public God(String godName, boolean godActive, String godType, String godAlign, int godPoints, List<UUID> playerList, List<Shrine> shrineList) {
 		this.name=godName;
 		this.active=godActive;
 		this.type= godType;
@@ -47,11 +48,11 @@ public class God {
 		this.points=givPoints;
 	}
 	
-	public List<PlayerData> getPlayers () {
+	public List<UUID> getPlayers () {
 		return this.players;
 	}
 	
-	public void addPlayer(PlayerData newPlayer) {
+	public void addPlayer(UUID newPlayer) {
 		this.players.add(newPlayer);
 	}
 	

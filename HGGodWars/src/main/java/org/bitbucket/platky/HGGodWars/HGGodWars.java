@@ -18,7 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 
-/* -quests give points
+/*-quests give points
  *  - minigames give points
  *  - allied vs enemy religion killing
  *  - money/god specific sacrifice, donation etc
@@ -48,6 +48,7 @@ public class HGGodWars extends JavaPlugin{
 		if(!playerFolder.exists()) {
 			playerFolder.mkdir();
 		}
+        getServer().getPluginManager().registerEvents(new EListener(), this);
 		loadConfig();
 		initPlayers();
 		initGods();
@@ -86,7 +87,12 @@ public class HGGodWars extends JavaPlugin{
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 		if (cmd.getName().equalsIgnoreCase("godwars")) {
 			if (args.length ==0) {
-				//god help
+				return true;
+			}
+			if(args[0].equalsIgnoreCase("players")) {
+				for (int i=0; i<players.size(); i++) {
+					sender.sendMessage(players.get(i).getName());
+				}
 				return true;
 			}
 			if(args[0].equalsIgnoreCase("create")) {
@@ -211,7 +217,7 @@ public class HGGodWars extends JavaPlugin{
 		String godAlign;
 		int godPoints;
 		List<String> idList = new ArrayList<String>();
-		List<PlayerData> playerList=new ArrayList<PlayerData>();
+		List<UUID> playerList=new ArrayList<UUID>();
 		List<Shrine> shrineList = new ArrayList<Shrine>();
 		for (int i =0; i< fileList.length; i++) {
 			if(fileList[i].getName() != "config.yml") { //verify this statement
@@ -224,7 +230,7 @@ public class HGGodWars extends JavaPlugin{
 				idList = yamlFile.getStringList("Members");
 				for (int j=0; j < idList.size(); j++) {
 					UUID pID =UUID.fromString(idList.get(j)); //convert from string back to uuid
-					PlayerData curPlayer = findPlayerD(pID);
+					UUID curPlayer = pID;
 					playerList.add(curPlayer); //holding a list of references to our playerData list
 				}
 				//officially create an instance of the god and throw it into our arraylist
@@ -252,6 +258,7 @@ public class HGGodWars extends JavaPlugin{
 			karma = yamlFile.getInt("Karma");
 			PlayerData newPlayer = new PlayerData(curPlayer, godName, karma, id);
 			players.add(newPlayer);
+			Bukkit.getLogger().info("Player started: " + id);
 		}
 		
 	}
@@ -294,12 +301,13 @@ public class HGGodWars extends JavaPlugin{
 				e.printStackTrace();
 			}
 
-			List<PlayerData> playerList=new ArrayList<PlayerData>();
+			List<UUID> playerList=new ArrayList<UUID>();
 			List<Shrine> shrineList = new ArrayList<Shrine>();
-			playerList.add(findPlayerD(player.getUniqueId()));
+			playerList.add(player.getUniqueId());
 			God newGod = new God(godName, false, godType, godAlign, 0, playerList, shrineList);
 			gods.add(newGod);
-			
+			//TODO update playerdata with god name
+			//TODO make sure player is not with god currently
 			return true;
 		} else {
 			player.sendMessage(ChatColor.RED + "This god already exists. Choose another name...");
@@ -316,7 +324,9 @@ public class HGGodWars extends JavaPlugin{
 			return false;
 		}
 		God curGod = findGod(godName);
-		curGod.addPlayer(findPlayerD(player.getUniqueId()));
+		curGod.addPlayer(player.getUniqueId());
+		//TODO update playerdata with god name
+		//TODO also make sure you arent with a god
 		updateActive(curGod);
 		saveGod(godName);
 		return true;
@@ -332,14 +342,6 @@ public class HGGodWars extends JavaPlugin{
 		return null; //god does not exist with that name
 	}
 	
-	public PlayerData findPlayerD(UUID givId) {
-		for (int i=0; i<players.size(); i++) {
-			if (givId == players.get(i).getUUID()) {
-				return players.get(i);
-			}
-		}
-		return null;
-	}
 	
 	public int findGodInd(String godName) {
 
@@ -370,17 +372,17 @@ public class HGGodWars extends JavaPlugin{
 	
 	//message all the players when the gods become active or not
 	public void msgActive(God givenGod, boolean way){
-		List<PlayerData> curPlayers = givenGod.getPlayers();
+		List<UUID> curPlayers = givenGod.getPlayers();
 		Player player;
 		for (int i=0; i<givenGod.playerCount(); i++) {
 			if (way == true) { //becoming active
-				player = curPlayers.get(i).getPlayer();
+				player = findPlayerD(curPlayers.get(i)).getPlayer();
 				if (player==null){ //player is not online
 					break;
 				}
 				player.sendMessage(ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
 			} else if(way ==false){ //becoming inactive
-				player = curPlayers.get(i).getPlayer();
+				player = findPlayerD(curPlayers.get(i)).getPlayer();
 				if (player==null){ //player is not online
 					break;
 				}
@@ -573,14 +575,14 @@ public class HGGodWars extends JavaPlugin{
 			sender.sendMessage(ChatColor.GOLD + "Points: " + ChatColor.WHITE + curGod.getPoints());
 			sender.sendMessage(ChatColor.GOLD + "# of Shrines: " + ChatColor.WHITE + curGod.shrineCount());
 			sender.sendMessage(ChatColor.GOLD + "Players: " + ChatColor.WHITE + curGod.playerCount() +" total");
-			List<PlayerData> curPlayers = curGod.getPlayers();
+			List<UUID> curPlayers = curGod.getPlayers();
 			if (curGod.playerCount() < 10) {
 				for (int i=0; i<curGod.playerCount(); i++) {
-					sender.sendMessage("- "+ curPlayers.get(i).getName()); //error here
+					sender.sendMessage("- "+ findPlayerD(curPlayers.get(i)).getName()); //error here
 				}
 			} else {
 				for (int i=0; i<10; i++) {
-					sender.sendMessage("- "+ curPlayers.get(i).getName());
+					sender.sendMessage("- "+ findPlayerD(curPlayers.get(i)).getName());
 				}
 				sender.sendMessage("and more....");
 			}
@@ -732,7 +734,7 @@ public class HGGodWars extends JavaPlugin{
 		}
 	}*/
 	
-	//find the god which has the specific player in it, return null if not found
+	//find the god which has the specific player in it, return null if not found (BROKEN)
 	public God findPlayerGod(Player player) {
 		for(int i=0; i< gods.size(); i++) {
 			if (gods.get(i).getPlayers().contains(player)) {
@@ -783,9 +785,13 @@ public class HGGodWars extends JavaPlugin{
 		}
 		return null;
 	}
+	
+	public static PlayerData findPlayerD(UUID givId) {
+		for (int i=0; i<players.size(); i++) {
+			if (givId.equals(players.get(i).getUUID())) {
+				return players.get(i);
+			}
+		}
+		return null;
+	}
 }
-
-//TODO gods list does not work properly
-//TODO godwars info does not work properly
-//TODO godwars join not working
-//TODO god file not updating after leaving
