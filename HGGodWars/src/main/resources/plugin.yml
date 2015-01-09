@@ -4,4 +4,6 @@ version: 0.0.1
 author: Platky
 commands:
     godwars:
-        description: Main HG GodWars command
+        description: Main HGGodWars command
+    karma:
+        description: Main karma command from HGGodWars

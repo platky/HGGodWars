@@ -25,6 +25,8 @@ import org.bukkit.plugin.java.JavaPlugin;
  *  - shrines to dungeons
  */
 
+//TODO if god no longer exists the player should not be associated with it
+
 public class HGGodWars extends JavaPlugin{
 
 
@@ -32,6 +34,9 @@ public class HGGodWars extends JavaPlugin{
 	public static File dataString;
 	public static List<God> gods = new ArrayList<God>();
 	public static List<PlayerData> players = new ArrayList<PlayerData>();
+	public static scoreboard kBoard;
+	public static Leaderboard leaders;
+	public static String bgs = ChatColor.GOLD + "[GodWars] ";
 	
 	public void onEnable() {
 		Bukkit.getLogger().info("onEnable has been invoked");
@@ -49,15 +54,24 @@ public class HGGodWars extends JavaPlugin{
 			playerFolder.mkdir();
 		}
         getServer().getPluginManager().registerEvents(new EListener(), this);
+        kBoard = new scoreboard();
 		loadConfig();
 		initPlayers();
 		initGods();
+        leaders = new Leaderboard();
+		
 	}
 	
 
 	public void onDisable() {
 		//cleanup any loose ends
-		// TODO save all gods using saveGod method
+		//save all gods using saveGod method
+		for (int i=0; i<gods.size(); i++) {
+			saveGod(gods.get(i).getGName());
+		}
+		for(int i=0; i<players.size(); i++) {
+			savePlayer(players.get(i).getUUID());
+		}
 	}
 	
 	public void loadConfig() {
@@ -85,11 +99,12 @@ public class HGGodWars extends JavaPlugin{
 	}*/
 	
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+		Player player = (Player) sender;
 		if (cmd.getName().equalsIgnoreCase("godwars")) {
 			if (args.length ==0) {
 				return true;
 			}
-			if(args[0].equalsIgnoreCase("players")) {
+			if(args[0].equalsIgnoreCase("players")) { //for debugging
 				for (int i=0; i<players.size(); i++) {
 					sender.sendMessage(players.get(i).getName());
 				}
@@ -97,11 +112,11 @@ public class HGGodWars extends JavaPlugin{
 			}
 			if(args[0].equalsIgnoreCase("create")) {
 				if(!sender.hasPermission("godwars.create")) { //================================================
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ ChatColor.RED + "You do not have permission");
 					return false;
 				}
 				if (args.length != 4) {
-					sender.sendMessage(ChatColor.RED + "try /godwars create <god name> <god type> <god alignment>");
+					sender.sendMessage(bgs+ChatColor.RED + "try /godwars create <god name> <god type> <god alignment>");
 					return false;
 				} else {
 					createGod(args[1], args[2], args[3], args, sender);
@@ -109,11 +124,11 @@ public class HGGodWars extends JavaPlugin{
 				}
 			} else if(args[0].equalsIgnoreCase("join")) { //join one of the existing gods ====================================
 				if(!sender.hasPermission("godwars.main")) {
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
 					return false;
 				}
 				if(args.length != 2) {
-					sender.sendMessage(ChatColor.RED + "try /godwars join <god name>");
+					sender.sendMessage(bgs+ChatColor.RED + "try /godwars join <god name>");
 					return false;
 				} else {
 					joinGod(args[1], sender);
@@ -121,13 +136,14 @@ public class HGGodWars extends JavaPlugin{
 				}
 			} else if(args[0].equalsIgnoreCase("list")) { //========================================================
 				if(!sender.hasPermission("godwars.main")) {
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
 					return false;
 				}
 				if(args.length == 1) {
 					listGods(sender, 1, false);
 					return true;
 				} else if(args.length ==2) {
+					//TODO remove the sort?
 					if (args[1].equalsIgnoreCase("sort") || args[1].equalsIgnoreCase("true")) {
 						listGods(sender, 1, true);
 						return true;
@@ -141,7 +157,7 @@ public class HGGodWars extends JavaPlugin{
 							listGods(sender, tempInt, false);
 							return true;
 						} catch(NumberFormatException e) {
-							sender.sendMessage(ChatColor.RED +"try /godwars list [page number] [sort]");
+							sender.sendMessage(bgs+ChatColor.RED +"try /godwars list [page number] [sort]");
 							return false;
 						}
 					}
@@ -157,31 +173,32 @@ public class HGGodWars extends JavaPlugin{
 						}
 						return false;
 					} catch(NumberFormatException e) {
-						sender.sendMessage(ChatColor.RED +"try /godwars list [page number] [sort]");
+						sender.sendMessage(bgs+ChatColor.RED +"try /godwars list [page number] [sort]");
 						return false;
 					}
 				} else {
 
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
 					return false;
 				}
 			} else if(args[0].equalsIgnoreCase("leave")) {//======================================
 				if(!sender.hasPermission("godwars.main")) {
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
 					return false;
 				}
 				if(args.length != 1){
-					sender.sendMessage(ChatColor.RED + "try /godwars leave");
+					sender.sendMessage(bgs+ChatColor.RED + "try /godwars leave");
 				} else {
-					leaveGod(findPlayerGod((Player) sender), sender);
+					PlayerData curPlayer = findPlayerD(player.getUniqueId());
+					leaveGod(findGod(curPlayer.getGodName()), sender);
 				}
 			} else if(args[0].equalsIgnoreCase("types")) {//====================================
 				if(!sender.hasPermission("godwars.main")) {
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
 					return false;
 				}
 				if(args.length !=1) {
-					sender.sendMessage(ChatColor.RED + "try /godwars types");
+					sender.sendMessage(bgs+ChatColor.RED + "try /godwars types");
 					return false;
 				} else {
 					listGodTypes(sender);
@@ -189,16 +206,134 @@ public class HGGodWars extends JavaPlugin{
 				}
 			} else if(args[0].equalsIgnoreCase("info")) {//==========================================
 				if(!sender.hasPermission("godwars.main")) {
-					sender.sendMessage(ChatColor.RED + "You do not have permission");
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
 					return false;
 				}
 				if(args.length !=2) {
-					sender.sendMessage(ChatColor.RED + "try /godwars info <godType|godName>");
+					sender.sendMessage(bgs+ChatColor.RED + "try /godwars info <godType|godName>");
+					return false;
 				} else {
 					if (godTypeInfo(sender, args[1]) ==false) {
 						godInfo(sender, args[1], true);
 					}
 					return true;
+				}
+			} else if(args[0].equalsIgnoreCase("leaderboard")) {//==========================================
+				if(!sender.hasPermission("godwars.main")) {
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
+					return false;
+				}
+				if(args.length !=1) {
+					sender.sendMessage(bgs+ChatColor.RED + "try /godwars leaderboard");
+					return false;
+				} else {
+					leaders.displayLeaders(player);
+					return true;
+				}
+			}
+		} else if(cmd.getName().equalsIgnoreCase("karma")) {
+			if (args.length==0) {//base command
+				if(!sender.hasPermission("godwars.karma")) {
+					sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
+				} else {
+					PlayerData curPlayer = findPlayerD(player.getUniqueId());
+					curPlayer.displayKarma();
+					return true;
+				}
+			}
+			if(args[0].equalsIgnoreCase("add")) {
+				if (args.length==3) {
+					Player changePlayer = playerOnline(args[1]);
+					if (changePlayer==null) {
+						sender.sendMessage(bgs+ChatColor.RED + "Player not found");
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma add <player name> <amount>");
+						return false;
+					}
+					if(!sender.hasPermission("godwars.karma.change")) {//TODO review this in application
+						sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
+						return false;
+					}
+					try {
+						int tempInt = Integer.parseInt(args[2]);
+						PlayerData changePlayerD = findPlayerD(player.getUniqueId());
+						changePlayerD.addKarma(tempInt);
+						return true;
+					}  catch(NumberFormatException e) {
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma add <player name> <amount>");
+						return false;
+					}
+				} else {
+					sender.sendMessage(bgs+ChatColor.RED + "Try /karma add <player name> <amount>");
+					return false;
+				}
+			} else if(args[0].equalsIgnoreCase("subtract")) {
+				if (args.length==3) {
+					Player changePlayer = playerOnline(args[1]);
+					if (changePlayer==null) {
+						sender.sendMessage(bgs+ChatColor.RED + "Player not found");
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma subtract <player name> <amount>");
+						return false;
+					}
+					if(!sender.hasPermission("godwars.karma.change")) {//TODO review this in application
+						sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
+						return false;
+					}
+					try {
+						int tempInt = Integer.parseInt(args[2]);
+						PlayerData changePlayerD = findPlayerD(player.getUniqueId());
+						changePlayerD.subKarma(tempInt);
+						return true;
+					}  catch(NumberFormatException e) {
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma subtract <player name> <amount>");
+						return false;
+					}
+				} else {
+					sender.sendMessage(bgs+ChatColor.RED + "Try /karma subtract <player name> <amount>");
+					return false;
+				}
+			} else if(args[0].equalsIgnoreCase("set")) {
+				if (args.length==3) {
+					Player changePlayer = playerOnline(args[1]);
+					if (changePlayer==null) {
+						sender.sendMessage(bgs+ChatColor.RED + "Player not found");
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma set <player name> <amount>");
+						return false;
+					}
+					if(!sender.hasPermission("godwars.karma.change")) {//TODO review this in application
+						sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
+						return false;
+					}
+					try {
+						int tempInt = Integer.parseInt(args[2]);
+						PlayerData changePlayerD = findPlayerD(player.getUniqueId());
+						changePlayerD.setKarma(tempInt);
+						return true;
+					}  catch(NumberFormatException e) {
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma set <player name> <amount>");
+						return false;
+					}
+				} else {
+					sender.sendMessage(bgs+ChatColor.RED + "Try /karma set <player name> <amount>");
+					return false;
+				}
+			} else if(args[0].equalsIgnoreCase("check")) {
+				if (args.length==2) {
+					Player changePlayer = playerOnline(args[1]);
+					if (changePlayer==null) {
+						sender.sendMessage(bgs+ChatColor.RED + "Player not found");
+						sender.sendMessage(bgs+ChatColor.RED + "Try /karma check <player name>");
+						return false;
+					}
+					if(!sender.hasPermission("godwars.karma")) {
+						sender.sendMessage(bgs+ChatColor.RED + "You do not have permission");
+						return false;
+					}
+					PlayerData changePlayerD = findPlayerD(player.getUniqueId());
+					sender.sendMessage(bgs+ChatColor.GREEN+changePlayerD.getName()+" has "+ changePlayerD.getKarma()+" karma");
+					return true;
+				} else {
+					sender.sendMessage(bgs+ChatColor.RED + "Try /karma check <player name>");
+					return false;
 				}
 			}
 		}
@@ -267,17 +402,24 @@ public class HGGodWars extends JavaPlugin{
 	public boolean createGod(String godName, String godType, String godAlign, String[] args, CommandSender sender) {
 		
 		Player player = (Player) sender;
+		PlayerData curPlayer = findPlayerD(player.getUniqueId());
+		if(!curPlayer.getGodName().equals("")){
+			player.sendMessage(bgs+ChatColor.RED + "You are already following a god. Type /godwars leave before creating another");
+			return false;
+		}
+		
 		File dataFolder = getDataFolder();
 		if(!dataFolder.exists()) {
 			//error
 			return false;
 		}
-		
-		if (correctType(godType)==null) {
-			sender.sendMessage(ChatColor.RED + godType +" is not an allowable type. Try /godwars types");
+		String godType2 = correctType(godType);
+		String godAlign2 = correctAlign(godAlign);
+		if (godType2==null) {
+			sender.sendMessage(bgs+ChatColor.RED + godType +" is not an allowable type. Try /godwars types");
 			return false;
-		} else if(correctAlign(godAlign)==null) {
-			sender.sendMessage(ChatColor.RED + godAlign +" is not an allowable alignment. Choose Good, Evil or Neutral");
+		} else if(godAlign2==null) {
+			sender.sendMessage(bgs+ChatColor.RED + godAlign +" is not an allowable alignment. Choose Good, Evil or Neutral");
 			return false;
 		}
 		
@@ -285,7 +427,7 @@ public class HGGodWars extends JavaPlugin{
 			try {
 				YamlConfiguration yamlFile = new YamlConfiguration();
 				yamlFile.set("Name", godName);
-				yamlFile.set("Active", "false");
+				yamlFile.set("Active", false);
 				yamlFile.set("Type", godType);
 				yamlFile.set("Points", 0);
 				yamlFile.set("Alignment", godAlign);
@@ -296,7 +438,7 @@ public class HGGodWars extends JavaPlugin{
 				
 				yamlFile.save(getDataFolder()+ File.separator+"Gods"+File.separator+  godName+".yml");
 
-				player.sendMessage(ChatColor.GREEN + "God Created!");
+				player.sendMessage(bgs+ChatColor.GREEN + "God Created!");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -306,11 +448,11 @@ public class HGGodWars extends JavaPlugin{
 			playerList.add(player.getUniqueId());
 			God newGod = new God(godName, false, godType, godAlign, 0, playerList, shrineList);
 			gods.add(newGod);
-			//TODO update playerdata with god name
-			//TODO make sure player is not with god currently
+			curPlayer.setGodName(godName);
+			savePlayer(curPlayer.getUUID());
 			return true;
 		} else {
-			player.sendMessage(ChatColor.RED + "This god already exists. Choose another name...");
+			player.sendMessage(bgs+ChatColor.RED + "This god already exists. Choose another name...");
 		}
 		
 		return false;
@@ -319,21 +461,27 @@ public class HGGodWars extends JavaPlugin{
 	//have the player join a god
 	public boolean joinGod(String godName, CommandSender sender) {
 		Player player = (Player) sender;
-		if(nameToGod(godName)!=null) {
-			sender.sendMessage(ChatColor.RED + "You are already following a god, type /godwars leave");
+		God curGod = findGod(godName);
+		if(curGod==null) {
+			sender.sendMessage(bgs+ChatColor.RED + "That god does not exist. Type /godwars list or create your own");
 			return false;
 		}
-		God curGod = findGod(godName);
+		PlayerData curPlayer = findPlayerD(player.getUniqueId());
+		if(!curPlayer.getGodName().equals("")){
+			player.sendMessage(bgs+ChatColor.RED + "You are already following a god. Type /godwars leave");
+			return false;
+		}
 		curGod.addPlayer(player.getUniqueId());
-		//TODO update playerdata with god name
-		//TODO also make sure you arent with a god
+		curPlayer.setGodName(godName);
 		updateActive(curGod);
 		saveGod(godName);
+		savePlayer(curPlayer.getUUID());
+		player.sendMessage(bgs+ChatColor.GREEN + "You are now following " + godName);
 		return true;
 	}
 	
 	//locate a god in our data list
-	public God findGod(String godName){
+	public static God findGod(String godName){
 		for(int i=0; i<gods.size(); i++) {
 			if(gods.get(i).getGName().equalsIgnoreCase(godName)) {
 				return gods.get(i);
@@ -380,13 +528,13 @@ public class HGGodWars extends JavaPlugin{
 				if (player==null){ //player is not online
 					break;
 				}
-				player.sendMessage(ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
+				player.sendMessage(bgs+ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
 			} else if(way ==false){ //becoming inactive
 				player = findPlayerD(curPlayers.get(i)).getPlayer();
 				if (player==null){ //player is not online
 					break;
 				}
-				player.sendMessage(ChatColor.RED + "Your god "+givenGod.getGName()+" is no longer active in this world");
+				player.sendMessage(bgs+ChatColor.RED + "Your god "+givenGod.getGName()+" is no longer active in this world");
 			}
 		}
 	}
@@ -408,9 +556,9 @@ public class HGGodWars extends JavaPlugin{
 			}
 			sender.sendMessage(curGods.get(i).getGName() + " - " + curGods.get(i).getType() + " - " + curGods.get(i).playerCount());
 		}
-		sender.sendMessage(ChatColor.GOLD + "------------------"+pageNum+"/"+pageMax+"--------------------");
+		sender.sendMessage(ChatColor.GOLD + "----------------"+pageNum+"/"+pageMax+"-----------------");
 		if (pageNum < pageMax) {
-			sender.sendMessage(ChatColor.GOLD + "Type \"/godwars list "+pageNum+1 +" [sort]\" for the next page");//double check the quotes work on this
+			sender.sendMessage(bgs+ChatColor.GOLD + "Type \"/godwars list "+pageNum+1 +" [sort]\" for the next page");//double check the quotes work on this
 		}
 		
 	}
@@ -559,12 +707,12 @@ public class HGGodWars extends JavaPlugin{
 		God curGod = findGod(godName);
 		if (curGod==null) {
 			if (typeF ==true) {
-				sender.sendMessage(ChatColor.RED + "That god or type does not exist");
-				sender.sendMessage(ChatColor.RED + "Type \"/godwars types\" for a list of current types");
-				sender.sendMessage(ChatColor.RED + "Type \"/godwars list\" for a list of current gods");
+				sender.sendMessage(bgs+ChatColor.RED + "That god or type does not exist");
+				sender.sendMessage(bgs+ChatColor.RED + "Type \"/godwars types\" for a list of current types");
+				sender.sendMessage(bgs+ChatColor.RED + "Type \"/godwars list\" for a list of current gods");
 			} else {
-				sender.sendMessage(ChatColor.RED + "That god does not exist");
-				sender.sendMessage(ChatColor.RED + "Type \"/godwars list\" for a list of current gods");
+				sender.sendMessage(bgs+ChatColor.RED + "That god does not exist");
+				sender.sendMessage(bgs+ChatColor.RED + "Type \"/godwars list\" for a list of current gods");
 			}
 			return false;
 		}else {
@@ -626,7 +774,13 @@ public class HGGodWars extends JavaPlugin{
 				yamlFile.set("Active", curGod.isActive());
 				yamlFile.set("Type", curGod.getType());
 				yamlFile.set("Points", 0);
-				yamlFile.set("Members",curGod.getPlayers());
+				List<String> stringPlayers = new ArrayList<String>();
+				List<UUID> curUUIDs = curGod.getPlayers();
+				for(int i=0; i<curUUIDs.size(); i++) {
+					stringPlayers.add(curUUIDs.get(i).toString());
+				}
+				yamlFile.set("Members", null);
+				yamlFile.set("Members",stringPlayers);//TODO check this
 				//will probably have to list shrines here aswell
 			
 				yamlFile.save(getDataFolder()+ File.separator+"Gods"+File.separator+  godName+".yml");
@@ -638,7 +792,7 @@ public class HGGodWars extends JavaPlugin{
 		}
 	}
 	
-	public boolean savePlayer(UUID id){
+	public static boolean savePlayer(UUID id){
 		String idString =id.toString();
 		if(!pFileExist(id)) {
 			Bukkit.getLogger().info("no file for that player exists");
@@ -646,7 +800,7 @@ public class HGGodWars extends JavaPlugin{
 			return false;
 		} else {
 			try {
-				File f = new File(dataString+ File.separator+"Playerse"+File.separator+  idString+".yml");
+				File f = new File(dataString+ File.separator+"Players"+File.separator+  idString+".yml");
 				YamlConfiguration yamlFile = YamlConfiguration.loadConfiguration(f);
 			
 				PlayerData curPlayer = findPlayerD(id);
@@ -654,7 +808,7 @@ public class HGGodWars extends JavaPlugin{
 				yamlFile.set("God", curPlayer.getGodName());
 				yamlFile.set("Karma", curPlayer.getKarma());
 			
-				yamlFile.save(getDataFolder()+ File.separator+  "Players" +File.separator+idString+".yml");
+				yamlFile.save(dataString+ File.separator+  "Players" +File.separator+idString+".yml");
 				return true;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -744,15 +898,6 @@ public class HGGodWars extends JavaPlugin{
 		return null;
 	}
 	
-	//get the specific god from just the name
-	public God nameToGod(String godName){
-		for (int i=0; i<gods.size(); i++) {
-			if(gods.get(i).getGName()==godName) {
-				return gods.get(i);
-			}
-		}
-		return null;
-	}
 	
 	public Boolean fileExist(String fileName) {
 		File file = new File(dataString+ File.separator+"Gods" + File.separator+ fileName+".yml");
@@ -766,25 +911,28 @@ public class HGGodWars extends JavaPlugin{
 	}
 	
 	
-	public void leaveGod(God curGod, CommandSender sender) {
+	public boolean leaveGod(God curGod, CommandSender sender) {
 		Player player = (Player) sender;
 		PlayerData playerD = findPlayerD(player.getUniqueId());
-		if (curGod.getPlayers().contains(playerD)) {
-			curGod.removePlayer(playerD);
-			sender.sendMessage(ChatColor.GREEN + "You have successfully left " + curGod.getGName());
+		if(curGod==null) {
+			if (!playerD.getGodName().equals("")) {
+				playerD.setGodName("");
+				savePlayer(playerD.getUUID());
+				return true;
+			}
+			sender.sendMessage(bgs+ChatColor.RED + "You are not involved with any god currently");
+			return false;
+		}
+		if (curGod.getPlayers().contains(playerD.getUUID())) {
+			curGod.removePlayer(playerD.getUUID());
+			playerD.clearGod();
+			sender.sendMessage(bgs+ChatColor.GREEN + "You have successfully left " + curGod.getGName());
 		}
 		saveGod(curGod.getGName());//save the file after removing the player
 		savePlayer(player.getUniqueId());
+		return true;
 	}
 	
-	public static PlayerData findPlayerData(Player player) {
-		for (int i=0; i<players.size(); i++) {
-			if(players.get(i).getPlayer() == player) {
-				return players.get(i);
-			}
-		}
-		return null;
-	}
 	
 	public static PlayerData findPlayerD(UUID givId) {
 		for (int i=0; i<players.size(); i++) {
@@ -792,6 +940,18 @@ public class HGGodWars extends JavaPlugin{
 				return players.get(i);
 			}
 		}
+		return null;
+	}
+	
+	//used when running in game commands with player names
+	public Player playerOnline(String givenName) {
+		Player[] onlinePlayers = Bukkit.getServer().getOnlinePlayers();
+		for (int i=0; i< onlinePlayers.length; i++) {
+			if (onlinePlayers[i].getName().equalsIgnoreCase(givenName)) {
+				return onlinePlayers[i];
+			}
+		}
+		
 		return null;
 	}
 }

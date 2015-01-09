@@ -2,3 +2,6 @@ name: HGGodWars
 main: org.bitbucket.platky.HGGodWars.HGGodWars
 version: 0.0.1
 author: Platky
+commands:
+    godwars:
+        description: Main HG GodWars command
