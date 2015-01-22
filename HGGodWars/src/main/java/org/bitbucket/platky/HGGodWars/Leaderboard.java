@@ -18,8 +18,8 @@ public class Leaderboard {
 		for (int i=0; i< HGGodWars.gods.size(); i++) {
 			rankedGods.add(HGGodWars.gods.get(i).getGName());
 		}
-		//sortGods();
-		sortGods(0, rankedGods.size()-1);
+		sortGods2();
+		//sortGods(0, rankedGods.size()-1);
 	}
 	
 	//TODO verify this works as intended
@@ -52,6 +52,23 @@ public class Leaderboard {
 		}
 	}
 	
+	public void sortGods2() {
+		boolean flag =true;
+		String tempS;
+		while (flag) {
+			flag=false;
+			for (int i=0; i<rankedGods.size()-1; i++) {
+				if (HGGodWars.findGod(rankedGods.get(i)).getPoints() < HGGodWars.findGod(rankedGods.get(i+1)).getPoints()) {
+					//swap
+					tempS = rankedGods.get(i);
+					rankedGods.set(i, rankedGods.get(i+1));
+					rankedGods.set(i+1, tempS);
+					flag=true;
+				}
+			}
+		}
+	}
+	
 	
 	public int godRank(God givenGod) {
 		//+1 since its an index and we want ranks to start at 1
@@ -75,7 +92,8 @@ public class Leaderboard {
 			if (i == rankedGods.size()) {
 				break;
 			}
-			player.sendMessage("" +ChatColor.GOLD + (i+1) +"." +ChatColor.WHITE + rankedGods.get(i));
+			player.sendMessage("" +ChatColor.GOLD + (i+1) +". " +ChatColor.WHITE + rankedGods.get(i)+" - "+ 
+			HGGodWars.findGod(rankedGods.get(i)).getPoints());
 		}
 	}
 }

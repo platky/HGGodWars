@@ -26,7 +26,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 
 //TODO if god no longer exists the player should not be associated with it
-
+//TODO on startup player is associated with all gods, multiple instances of player being added over time
 public class HGGodWars extends JavaPlugin{
 
 
@@ -72,6 +72,8 @@ public class HGGodWars extends JavaPlugin{
 		for(int i=0; i<players.size(); i++) {
 			savePlayer(players.get(i).getUUID());
 		}
+		gods.clear();
+		players.clear();
 	}
 	
 	public void loadConfig() {
@@ -230,6 +232,8 @@ public class HGGodWars extends JavaPlugin{
 					leaders.displayLeaders(player);
 					return true;
 				}
+			} else if(args[0].equalsIgnoreCase("play")){
+				sender.sendMessage("Current Players Count: " + players.size());
 			}
 		} else if(cmd.getName().equalsIgnoreCase("karma")) {
 			if (args.length==0) {//base command
@@ -351,10 +355,10 @@ public class HGGodWars extends JavaPlugin{
 		String godType;
 		String godAlign;
 		int godPoints;
-		List<String> idList = new ArrayList<String>();
-		List<UUID> playerList=new ArrayList<UUID>();
-		List<Shrine> shrineList = new ArrayList<Shrine>();
 		for (int i =0; i< fileList.length; i++) {
+			List<String> idList = new ArrayList<String>();
+			List<UUID> playerList=new ArrayList<UUID>();
+			List<Shrine> shrineList = new ArrayList<Shrine>();
 			if(fileList[i].getName() != "config.yml") { //verify this statement
 				yamlFile = YamlConfiguration.loadConfiguration(fileList[i]);
 				godName = yamlFile.getString("Name");
@@ -368,6 +372,10 @@ public class HGGodWars extends JavaPlugin{
 					UUID curPlayer = pID;
 					playerList.add(curPlayer); //holding a list of references to our playerData list
 				}
+
+				Bukkit.getLogger().info("God Player List " + godName);
+				Bukkit.getLogger().info("Players: " + playerList);
+				Bukkit.getLogger().info("  ");
 				//officially create an instance of the god and throw it into our arraylist
 				//shrinelists not currently implemented
 				God newGod = new God(godName, godActive, godType, godAlign,  godPoints, playerList, shrineList);

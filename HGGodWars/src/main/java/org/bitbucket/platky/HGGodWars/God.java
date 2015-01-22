@@ -23,6 +23,7 @@ public class God {
 		this.points=godPoints;
 		this.players=playerList;
 		this.shrines=shrineList;
+		calcKarma();
 	}
 	
 	public String getGName(){
@@ -42,6 +43,7 @@ public class God {
 	}
 	
 	public int getPoints() {
+		calcKarma();
 		return this.points +this.karmaPoints;
 	}
 	
