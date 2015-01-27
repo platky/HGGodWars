@@ -16,7 +16,9 @@ public class Leaderboard {
 	public void updateGods() {
 		rankedGods.clear();
 		for (int i=0; i< HGGodWars.gods.size(); i++) {
-			rankedGods.add(HGGodWars.gods.get(i).getGName());
+			if(HGGodWars.gods.get(i).isActive()){
+				rankedGods.add(HGGodWars.gods.get(i).getGName());
+			}
 		}
 		sortGods2();
 		//sortGods(0, rankedGods.size()-1);

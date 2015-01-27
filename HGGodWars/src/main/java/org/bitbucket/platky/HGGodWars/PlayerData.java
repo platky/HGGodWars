@@ -13,6 +13,7 @@ public class PlayerData {
 	private UUID id;
 	private String godName;
 	private int karma;
+	private int joinCD; //stop players from leaving and joining tons of gods
 	
 	public PlayerData(Player givPlayer, String givGod, int givKarma, UUID givId) {
 		this.player=givPlayer;

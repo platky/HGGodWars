@@ -32,6 +32,7 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="Heroes-javadoc-public.jar"/>
+	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="lib" path="Heroes.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

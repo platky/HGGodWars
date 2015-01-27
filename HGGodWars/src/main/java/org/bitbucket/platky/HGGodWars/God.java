@@ -47,6 +47,10 @@ public class God {
 		return this.points +this.karmaPoints;
 	}
 	
+	public int getRegPoints() {
+		return this.points;
+	}
+	
 	public void setPoints(int givPoints) {
 		this.points=givPoints;
 	}
@@ -57,10 +61,18 @@ public class God {
 	
 	public void addPlayer(UUID newPlayer) {
 		this.players.add(newPlayer);
+		if(players.size()>= HGGodWars.minMembers){
+			this.active=true;
+			HGGodWars.msgActive(this, this.active);
+		}
 	}
 	
 	public void removePlayer(UUID oldPlayer) {
 		this.players.remove(oldPlayer);
+		if(players.size()< HGGodWars.minMembers){
+			this.active=false;
+			HGGodWars.msgActive(this, this.active);
+		}
 	}
 	
 	public int playerCount(){
@@ -74,6 +86,7 @@ public class God {
 	public int shrineCount() {
 		return this.shrines.size();
 	}
+	
 	
 	//calculates karma of all the members associated with this god
 	public void calcKarma() {
@@ -151,5 +164,10 @@ public class God {
 				}
 			}
 		}
+	}
+	
+	//put gifting to gods in here
+	public boolean giftGod() {
+		return false;
 	}
 }

@@ -12,13 +12,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scoreboard.Score;
 
 public class EListener implements Listener{
-
+	
+	//dont forget to apply perks if necessary
 	@EventHandler
 	public void onLogin(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
@@ -51,6 +53,7 @@ public class EListener implements Listener{
 			curScore.setScore(playerD.getKarma());
 			playerD.realignKarma();
 		}
+		HGGodWars.perks.justJoined(player);
 	}
 	
 	
@@ -60,6 +63,7 @@ public class EListener implements Listener{
 		if (player==null) {
 			Bukkit.getLogger().info("ERROR player is null");
 		}
+		HGGodWars.perks.justLeft(player);
 		endPlayer(player);
 	}
 	
@@ -127,6 +131,25 @@ public class EListener implements Listener{
 		}
 		return true;
 	}
+	
+	//TODO verify this
+	@EventHandler
+	public void onFoodLevelChange(FoodLevelChangeEvent event) {
+		LivingEntity ent = event.getEntity();
+		if(ent instanceof Player) {
+			if(HGGodWars.perks.hungerOff==true) {
+				Player player = (Player) ent;
+				PlayerData curPlayer = HGGodWars.findPlayerD(player.getUniqueId());
+				if(HGGodWars.perks.getAffectedPlayers().contains(curPlayer)) {
+					Bukkit.getLogger().info("Stopping Hunger");
+					player.setFoodLevel(20);
+					event.setCancelled(true);
+				}
+			}
+		}
+	}
+	
+	
 	
 	
 	public PlayerData startPlayer(Player player) {

@@ -15,7 +15,11 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitScheduler;
+
+import com.herocraftonline.heroes.Heroes;
 
 
 /*-quests give points
@@ -28,7 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 //TODO if god no longer exists the player should not be associated with it
 //TODO on startup player is associated with all gods, multiple instances of player being added over time
 public class HGGodWars extends JavaPlugin{
-
+	public static Heroes heroPlugin;
 
 	//public static HGGodWars hggw = new HGGodWars();
 	public static File dataString;
@@ -36,10 +40,19 @@ public class HGGodWars extends JavaPlugin{
 	public static List<PlayerData> players = new ArrayList<PlayerData>();
 	public static scoreboard kBoard;
 	public static Leaderboard leaders;
+	public static Perks perks;
 	public static String bgs = ChatColor.GOLD + "[GodWars] ";
+	public static BukkitScheduler scheduler;
+	
+	
+	public static int minMembers;
+	public static int heroesXp;
+	public static boolean useHeroes;
 	
 	public void onEnable() {
 		Bukkit.getLogger().info("onEnable has been invoked");
+		heroPlugin = (Heroes)Bukkit.getPluginManager().getPlugin("Heroes");
+		
 		File dataFolder = getDataFolder();
 		dataString = getDataFolder();
 		if(!dataFolder.exists()) {
@@ -59,7 +72,13 @@ public class HGGodWars extends JavaPlugin{
 		initPlayers();
 		initGods();
         leaders = new Leaderboard();
-		
+        perks = new Perks(heroesXp, useHeroes);
+		scheduler = Bukkit.getServer().getScheduler();
+		scheduler.scheduleSyncRepeatingTask(this, new Runnable() {
+			public void run() {
+				perks.runPerks();
+			}
+		}, 0L, 1200L); //72000 is once per hour
 	}
 	
 
@@ -85,7 +104,9 @@ public class HGGodWars extends JavaPlugin{
 		getConfig().addDefault("Variables.EnableAlignment", true);
 		getConfig().addDefault("Heroes.UseHeroes", false);//should default to false;
 		getConfig().addDefault("Heroes.XpBuff", 1.2);
-		
+		minMembers = getConfig().getInt("Restrictions.MinPlayers");
+		heroesXp = getConfig().getInt("Heroes.XpBuff");
+		useHeroes = getConfig().getBoolean("Heroes.UseHeroes");
 		getConfig().options().copyDefaults(true); //further review this
 		saveConfig();
 	}
@@ -193,6 +214,8 @@ public class HGGodWars extends JavaPlugin{
 				} else {
 					PlayerData curPlayer = findPlayerD(player.getUniqueId());
 					leaveGod(findGod(curPlayer.getGodName()), sender);
+					perks.justLeft(player);
+					perks.removeAffected(curPlayer);
 				}
 			} else if(args[0].equalsIgnoreCase("types")) {//====================================
 				if(!sender.hasPermission("godwars.main")) {
@@ -430,6 +453,12 @@ public class HGGodWars extends JavaPlugin{
 			sender.sendMessage(bgs+ChatColor.RED + godAlign +" is not an allowable alignment. Choose Good, Evil or Neutral");
 			return false;
 		}
+		if(godName.equalsIgnoreCase("Agriculture") || godName.equalsIgnoreCase("Life")|| godName.equalsIgnoreCase("Knowledge")
+			|| godName.equalsIgnoreCase("Mountains")|| godName.equalsIgnoreCase("Nature")|| godName.equalsIgnoreCase("Sea")
+			|| godName.equalsIgnoreCase("Technology")|| godName.equalsIgnoreCase("Undead")|| godName.equalsIgnoreCase("War")
+			|| godName.equalsIgnoreCase("Wealth")|| godName.equalsIgnoreCase("Evil")|| godName.equalsIgnoreCase("Good")|| godName.equalsIgnoreCase("Neutral")) {
+			sender.sendMessage(bgs + ChatColor.RED + "You can not name your god "+ godName);
+		}
 		
 		if (fileExist(godName)==false) {
 			try {
@@ -510,8 +539,7 @@ public class HGGodWars extends JavaPlugin{
 	}
 	//update the gods status as active or not
 	public void updateActive(God givenGod) {
-		int reqPlayer = getConfig().getInt("Restrictions.MinPlayers");
-		if (givenGod.playerCount() >= reqPlayer) {
+		if (givenGod.playerCount() >= minMembers) {
 			if (givenGod.isActive()) {
 				
 			} else {
@@ -527,22 +555,24 @@ public class HGGodWars extends JavaPlugin{
 	}
 	
 	//message all the players when the gods become active or not
-	public void msgActive(God givenGod, boolean way){
+	public static void msgActive(God givenGod, boolean way){
 		List<UUID> curPlayers = givenGod.getPlayers();
 		Player player;
 		for (int i=0; i<givenGod.playerCount(); i++) {
 			if (way == true) { //becoming active
 				player = findPlayerD(curPlayers.get(i)).getPlayer();
 				if (player==null){ //player is not online
-					break;
+					//break;
+				} else {
+					player.sendMessage(bgs+ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
 				}
-				player.sendMessage(bgs+ChatColor.GREEN + "Your god "+givenGod.getGName()+" is now active in this world!");
 			} else if(way ==false){ //becoming inactive
 				player = findPlayerD(curPlayers.get(i)).getPlayer();
 				if (player==null){ //player is not online
-					break;
+					//break;
+				} else {
+					player.sendMessage(bgs+ChatColor.RED + "Your god "+givenGod.getGName()+" is no longer active in this world");
 				}
-				player.sendMessage(bgs+ChatColor.RED + "Your god "+givenGod.getGName()+" is no longer active in this world");
 			}
 		}
 	}
@@ -652,7 +682,7 @@ public class HGGodWars extends JavaPlugin{
 		if (type.equalsIgnoreCase("Agriculture")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Agriculture");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "flowers, wheat, melon, potatoes, carrots");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Never hungry, Increased farming drops");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Never hungry, Increased farming drops");
 			return true;
 		} else if (type.equalsIgnoreCase("Crafting")) {
 			
@@ -661,49 +691,49 @@ public class HGGodWars extends JavaPlugin{
 		} else if (type.equalsIgnoreCase("Life")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Life");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "eggs, seeds");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, 1.5x HP");//heroes dependency
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.5x HP");//heroes dependency
 			return true;
 		} else if (type.equalsIgnoreCase("Knowledge")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Knowledge");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "books");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, 1.5x Mana");//heroes dependency
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.5x Mana");//heroes dependency
 			return true;
 		} else if (type.equalsIgnoreCase("Mountains")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Mountains");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "stone, cobblestone");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Increased stone and ore drops");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Increased stone and ore drops");
 			return true;
 		} else if (type.equalsIgnoreCase("Nature")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Nature");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "logs, leaves, vines");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Increased dig speed and soil drops");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Increased dig speed and soil drops");
 			return true;
 		} else if (type.equalsIgnoreCase("Sea")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Sea");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "fish, buckets of water");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Breath underwater, Fishing increase");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Breath underwater, Fishing increase");
 			return true;
 		} else if (type.equalsIgnoreCase("Technology")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Technology");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "stone, cobblestone");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Night vision goggles");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Night vision goggles");
 			return true;
 		} else if (type.equalsIgnoreCase("Time")) {
 			
 		} else if (type.equalsIgnoreCase("Undead")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Undead");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "rotten flesh");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Poison attackers");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Resist Fire, Resist Poison");
 			return true;
 		} else if (type.equalsIgnoreCase("War")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "War");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "player heads");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Increased damage");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Increased damage");
 			return true;
 		} else if (type.equalsIgnoreCase("Wealth")) {
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Type: " + ChatColor.WHITE + "Wealth");
 			sender.sendMessage(ChatColor.DARK_PURPLE + "Gifts: " + ChatColor.WHITE + "diamond, emerald");
-			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "1.2x Heroes XP, Passive money increase");
+			sender.sendMessage(ChatColor.DARK_PURPLE + "Base Perks: " + ChatColor.WHITE + "Passive money increase");
 			return true;
 		} else {
 			//sender.sendMessage(ChatColor.RED + "That is not one of the available types");
@@ -781,7 +811,7 @@ public class HGGodWars extends JavaPlugin{
 				God curGod = findGod(godName);
 				yamlFile.set("Active", curGod.isActive());
 				yamlFile.set("Type", curGod.getType());
-				yamlFile.set("Points", 0);
+				yamlFile.set("Points", curGod.getRegPoints());
 				List<String> stringPlayers = new ArrayList<String>();
 				List<UUID> curUUIDs = curGod.getPlayers();
 				for(int i=0; i<curUUIDs.size(); i++) {
@@ -953,10 +983,10 @@ public class HGGodWars extends JavaPlugin{
 	
 	//used when running in game commands with player names
 	public Player playerOnline(String givenName) {
-		Player[] onlinePlayers = Bukkit.getServer().getOnlinePlayers();
-		for (int i=0; i< onlinePlayers.length; i++) {
-			if (onlinePlayers[i].getName().equalsIgnoreCase(givenName)) {
-				return onlinePlayers[i];
+		List<Player> onlinePlayers = (List)Bukkit.getServer().getOnlinePlayers();
+		for (int i=0; i< onlinePlayers.size(); i++) {
+			if (onlinePlayers.get(i).getName().equalsIgnoreCase(givenName)) {
+				return onlinePlayers.get(i);
 			}
 		}
 		
