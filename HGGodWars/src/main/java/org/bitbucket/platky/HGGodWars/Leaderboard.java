@@ -79,9 +79,13 @@ public class Leaderboard {
 	
 	public God firstPlace() {
 		updateGods();
+		if(rankedGods.isEmpty()) {
+			return null;
+		}
 		if (HGGodWars.findGod(rankedGods.get(0)).getPoints() == HGGodWars.findGod(rankedGods.get(1)).getPoints()) {
 			return null;
 		}
+		
 		return HGGodWars.findGod(rankedGods.get(0));
 	}
 	

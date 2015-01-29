@@ -78,7 +78,7 @@ public class HGGodWars extends JavaPlugin{
 			public void run() {
 				perks.runPerks();
 			}
-		}, 0L, 1200L); //72000 is once per hour
+		}, 200L, 72000L); //72000 is once per hour
 	}
 	
 
@@ -125,6 +125,9 @@ public class HGGodWars extends JavaPlugin{
 		Player player = (Player) sender;
 		if (cmd.getName().equalsIgnoreCase("godwars")) {
 			if (args.length ==0) {
+				if(player != null) {
+					helpCmds(player);
+				}
 				return true;
 			}
 			if(args[0].equalsIgnoreCase("players")) { //for debugging
@@ -992,4 +995,33 @@ public class HGGodWars extends JavaPlugin{
 		
 		return null;
 	}
+	
+	public void helpCmds(Player player) {
+		player.sendMessage(bgs+"Here are your available GodWars commands");
+		if(player.hasPermission("godwars.main")) {
+			player.sendMessage(ChatColor.GOLD+"/godwars join <godname> :"+ChatColor.WHITE+" To join an existing god");
+			player.sendMessage(ChatColor.GOLD+"/godwars leave :"+ChatColor.WHITE+" To leave your god");
+			player.sendMessage(ChatColor.GOLD+"/godwars list :"+ChatColor.WHITE+" To list the available gods");
+			player.sendMessage(ChatColor.GOLD+"/godwars types :"+ChatColor.WHITE+" To list the possible types of gods");
+			player.sendMessage(ChatColor.GOLD+"/godwars info <godtype/godname> :"+ChatColor.WHITE+" To get info on a selected god type or existing god");
+			player.sendMessage(ChatColor.GOLD+"/godwars leaderboard :"+ChatColor.WHITE+" To check the current leaderboard");
+		}
+		
+		if(player.hasPermission("godwars.create")) {
+			player.sendMessage(ChatColor.GOLD+"/godwars create <godname> <godtype> <alignment> :"+ChatColor.WHITE+" To create a god");
+		}
+		
+		if(player.hasPermission("godwars.karma")) {
+			player.sendMessage(ChatColor.GOLD+"/karma :"+ChatColor.WHITE+" To check your karma");
+			player.sendMessage(ChatColor.GOLD+"/karma check <playername>:"+ChatColor.WHITE+" To check another playeres karma");
+		}
+		
+		if(player.hasPermission("godwars.karma.change")){
+			player.sendMessage(ChatColor.GOLD+"/karma add <playername> <amount> :"+ChatColor.WHITE+" To add karma to a player");
+			player.sendMessage(ChatColor.GOLD+"/karma subtract <playername> <amount> :"+ChatColor.WHITE+" To subtract karma from a player");
+			player.sendMessage(ChatColor.GOLD+"/karma set <playername> <amount> :"+ChatColor.WHITE+" To set the karma of a player");
+		}
+	}
 }
+
+
